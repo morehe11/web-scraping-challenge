@@ -4,33 +4,15 @@ import pandas as pd
 import datetime as dt
 from webdriver_manager.chrome import ChromeDriverManager
 
+executable_path = {'executable_path': ChromeDriverManager().install()}
+browser = Browser('chrome', **executable_path, headless = True)
 
-def scrape_all():
-   executable_path = {'executable_path': ChromeDriverManager().install()}
-   browser = Browser('chrome', **executable_path, headless = True)
-
-   news_title, news_para = mars_news(browser)
-
-   data = {
-       "news_title": news_title,
-        "news_paragraph": news_para,
-        "featured_image": featured_image(browser),
-        "facts": mars_facts(),
-        "hemispheres": hemispheres(browser),
-        "last_modified": dt.datetime.now()
-   }
-
-   browser.quit()
-   return data
-
-def mars_news(browser):
+def scrape_news(browser):
     url = "https://redplanetscience.com/"
     browser.visit(url)
     html = browser.html
     NASA_news_soup = soup(html, "html.parser")
-
     try:
-
        slide_elem = NASA_news_soup.select_one('div.list_text')
        news_title = slide_elem.find("div", class_ = "conent_title").get_text()
        news_para = slide_elem.find("div", class_ = "article_teaser_body").get_text()
@@ -47,11 +29,9 @@ def featured_image(browser):
     featured_image_elem = browser.find_by_tag('button')[1]
     featured_image_elem.click()     
 
-  
     html = browser.html
     img_soup = soup(html, 'html.parser')
 
-   
     try:
       
         img_url_rel = img_soup.find('img', class_='fancybox-image').get('src')
@@ -88,45 +68,59 @@ def hemispheres(browser):
     browser.visit(url + 'index.html')
 
     
-    hemisphere_image_urls = []
-    for i in range(4):
-        
-        browser.find_by_css("a.product-item img")[i].click()
-        hemi_data = scrape_hemisphere(browser.html)
-        hemi_data['img_url'] = url + hemi_data['img_url']
-    
-        hemisphere_image_urls.append(hemi_data)
-     
+    hemi_urls = []
+    links = browser.find_by_css('a.product-item img')
+    for i in range(len(links)):
+        hemisphere = {}
+        browser.find_by_css('aproduct-item img')[i].click()
+        samp_elem = browser.links.find_by_text('Sample').first
+        hemisphere['img_url'] = samp_elem['href']
+        hemisphere['title'] = browser.find_by_css('h2.title').text
+        hemi_urls.append(hemisphere)
         browser.back()
 
-    return hemisphere_image_urls
+    return hemi_urls
 
 
 def scrape_hemisphere(html_text):
     
     hemi_soup = soup(html_text, "html.parser")
 
-   
     try:
-        title_elem = hemi_soup.find("h2", class_="title").get_text()
+        title = hemi_soup.find("h2", class_="title").get_text()
         samp_elem = hemi_soup.find("a", text="Sample").get("href")
 
     except AttributeError:
         
-        title_elem = None
+        title = None
         samp_elem = None
 
     hemispheres = {
-        "title": title_elem,
+        "title": title,
         "img_url": samp_elem
     }
 
     return hemispheres
 
+def scrape_all():
+    executable_path = {'executable_path': ChromeDriverManager().install()}
+    browser = Browser('chrome', **executable_path, headless = True)
+
+    news_title, news_para = scrape_news(browser)
+
+    data = {
+       "news_title": news_title,
+        "news_paragraph": news_para,
+        "featured_image": featured_image(browser),
+        "news_facts": mars_facts(),
+        "hemispheres": hemispheres(browser),
+        "timestamps": dt.datetime.now()
+   }
+
+    browser.quit()
+    return data
 
 if __name__ == "__main__":
-
-    
     print(scrape_all())
 
     
